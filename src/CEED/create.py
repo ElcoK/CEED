@@ -56,14 +56,82 @@ def iso2_to_iso3(iso2):
     return dict_[iso2]
 
 
-def prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_path):
+def landuse_value_to_name(value):
+
+    land_use_dict = {
+    1 : "Continuous urban fabric",
+    2 : "Discontinuous urban fabric",
+    3 : "Industrial or commercial units",
+    4 : "Road and rail networks and associated land",
+    5 : "Port areas",
+    6 : "Airports",
+    7 : "Mineral extraction sites",
+    8 : "Dump sites",
+    9 : "Construction sites",
+    10 : "Green urban areas",
+    11 : "Sport and leisure facilities",
+    12 : "Non-irrigated arable land",
+    23 : "Permanently irrigated land",
+    14 : "Rice fields",
+    15 : "Vineyards",
+    16 : "Fruit trees and berry plantations",
+    17 : "Olive groves",
+    18 : "Pastures",
+    19 : "Annual crops associated with permanent crops",
+    20 : "Complex cultivation patterns",
+    21 : "Land principally occupied by agriculture with significant areas of natural vegetation",
+    22 : "Agro-forestry areas",
+    23 : "Broad-leaved forest",
+    24 : "Coniferous forest",
+    25 : "Mixed forest",
+    26 : "Natural grasslands",
+    27 : "Moors and heathland",
+    28 : "Sclerophyllous vegetation",
+    29 : "Transitional woodland-shrub",
+    30 : "Beaches dunes sands",
+    31 : "Bare rocks",
+    32 : "Sparsely vegetated areas",
+    33 : "Burnt areas",
+    34 : "Glaciers and perpetual snow",
+    35 : "Inland marshes",
+    36 : "Peat bogs",
+    37 : "Salt marshes",
+    38 : "Salines",
+    39 : "Intertidal flats",
+    40 : "Water courses",
+    41 : "Water bodies",
+    42 : "Coastal lagoons",
+    43 : "Estuaries",
+    44 : "Sea and ocean",
+    48 : "NODATA",
+    1111: "Continuous urban fabric",
+    1112 : "Discontinuous urban fabric",   
+    1113 : "Discontinuous urban fabric",
+    1121 : "Industrial or commercial units",
+    1122 : "Nuclear energy plants and associated land",
+    1210 : "Road and rail networks and associated land",
+    1220 : "Road and rail networks and associated land",     
+    1231 : "Cargo port",
+    1232 : "Passenger port",
+    1233 : "Fishing port",   
+    1234 : "Naval port",  
+    1235 : "Marinas",   
+    1236 : "Local multi-functional harbours",   
+    1237 : "Shipyards",
+    }    
+    try:
+        return land_use_dict[value]
+    except:
+        return "Port areas"
+     
+def prepare_buildings(nuts2, nuts2_europe, building_path, CLC_path, coastal_CLC_path):
     """
     Prepares building data for a given NUTS2 region by performing various spatial operations and data processing.
     
     Parameters:
         nuts2 (str): The NUTS2 code of the region to prepare the building data for.
         nuts2_europe (GeoDataFrame): A GeoDataFrame containing the NUTS2 geometries for Europe.
-        bucco_path (str): The path to the directory containing the building data files.
+        building_path (str): The path to the directory containing the building data files.
         CLC_path (str): The path to the CLC 2018 file.
         coastal_CLC_path (str): The path to the coastal CLC file.
         
@@ -77,7 +145,7 @@ def prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_pat
     Example:
         nuts2 = 'NL32'
         nuts2_europe = gpd.read_file('nuts2_europe.shp')
-        bucco_path = '/path/to/bucco_data/'
+        building_path = '/path/to/bucco_data/'
         CLC_path = '/path/to/CLC2018.tif'
         coastal_CLC_path = '/path/to/coastal_CLC.parquet'
         prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_path)
@@ -96,10 +164,15 @@ def prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_pat
     nuts2_geom = nuts2_europe.loc[nuts2_europe.NUTS_ID == nuts2].geometry.values[0]
 
     # load buildings for the country
-    gdf_bucco = gpd.read_parquet(os.path.join(bucco_path, '{}_bucco.parquet'.format(iso2_to_iso3(country_iso2))))
+    if 'bucco' in building_path:
+        gdf_buildings = gpd.read_parquet(os.path.join(building_path, '{}_bucco.parquet'.format(iso2_to_iso3(country_iso2))))
+    else:
+        gdf_buildings = gpd.read_parquet(os.path.join(building_path, '{}_buildings.parquet'.format(iso2_to_iso3(country_iso2))))
+        gdf_buildings = gdf_buildings.to_crs(epsg=3035)
+       
 
     # bounding box clip
-    bbox_buildings = gdf_bucco.iloc[gdf_bucco.centroid.clip(nuts2_geom.bounds).index].reset_index(drop=True)
+    bbox_buildings = gdf_buildings.iloc[gdf_buildings.centroid.clip(nuts2_geom.bounds).index].reset_index(drop=True)
 
     if len(bbox_buildings) == 0:
         return None
@@ -130,7 +203,11 @@ def prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_pat
 
     # get unique use type per building
     tqdm.pandas(desc='get unique use type')
-    nuts2_buildings['use_type'] = nuts2_buildings.progress_apply(lambda x: final_land_use(x), axis=1)
+    nuts2_buildings['use_type_val'] = nuts2_buildings.progress_apply(lambda x: final_land_use(x), axis=1)
+    
+    # add string column for use type
+    nuts2_buildings['use_type'] = nuts2_buildings.use_type_val.progress_apply(lambda x: landuse_value_to_name(x))
+
 
     nuts2_buildings = nuts2_buildings.drop(['centroid', 'land_use', 'coastal_land_use'], axis=1)
 
@@ -219,6 +296,7 @@ def nuts2_exposure(nuts2):
     data_path = 'c://data//CEED'
     input_data = os.path.join(data_path, 'input_data')
     bucco_path = os.path.join(data_path, 'coastal_bucco_exact')
+    buildings_path = os.path.join(data_path, 'coastal_buildings_exact')
     osm_path = os.path.join(data_path, 'coastal_osm_exact')
 
     # Read NUTS2 data for Europe
@@ -231,6 +309,10 @@ def nuts2_exposure(nuts2):
 
     # Prepare building data for the NUTS2 region
     nuts2_buildings = prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_path)
+
+    if nuts2_buildings is None:
+        print('INTERMEDIATE UPDATE : No buildings found for {}, will fall back to OSM'.format(nuts2))
+        nuts2_buildings = prepare_buildings(nuts2, nuts2_europe, buildings_path, CLC_path, coastal_CLC_path)
 
     print('INTERMEDIATE UPDATE: Buildings prepared for {}'.format(nuts2))
 
@@ -261,6 +343,6 @@ def nuts2_exposure(nuts2):
 
 if __name__ == "__main__":
 
-    nuts_pilots = ['LT02','ES21','ES52','ITC3','FRI3']
+    nuts_pilots = ['ES21']#,'ES52','ITC3','FRI3']
     for nuts2 in nuts_pilots:
         nuts2_combined = nuts2_exposure(nuts2)
