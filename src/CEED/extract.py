@@ -71,7 +71,7 @@ def all_cis_osm():
     data_path, input_data, osm_data, cis_data, bucco_path = set_paths()
 
     # Grab country codes from OSM data directory
-    country_codes = [x.split('.')[0][-3:] for x in os.listdir(osm_data) if x.endswith('.pbf')]
+    country_codes = [x.split('.')[0][-3:] for x in os.listdir(osm_data) if x.endswith('.pbf')][::-1]
 
     # Process CIS for each country
     for country_code in tqdm(country_codes, total=len(country_codes)):

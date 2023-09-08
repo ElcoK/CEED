@@ -63,7 +63,7 @@ def clip_bucco(country_code):
 
     # Set file paths
     file_path = os.path.join(bucco_path, '{}_bucco.parquet'.format(country_code))
-    out_path = os.path.join(input_data, '..', 'coastal_bucco', '{}_bucco.parquet').format(country_code)
+    out_path = os.path.join(input_data, '..', 'coastal_buildings_exact', '{}_bucco.parquet').format(country_code)
 
     # Load coastal mask
     mask = read_coastal_mask(input_data)
@@ -167,4 +167,4 @@ def all_cis_osm():
 
     
 if __name__ == "__main__":
-    all_cis_osm()
+    clip_bucco('NLD')

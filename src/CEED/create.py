@@ -124,7 +124,7 @@ def landuse_value_to_name(value):
     except:
         return "Port areas"
      
-def prepare_buildings(nuts2, nuts2_europe, building_path, CLC_path, coastal_CLC_path):
+def prepare_buildings(nuts2, nuts2_europe, building_path, CLC_path, coastal_CLC_path,height_path):
     """
     Prepares building data for a given NUTS2 region by performing various spatial operations and data processing.
     
@@ -188,6 +188,9 @@ def prepare_buildings(nuts2, nuts2_europe, building_path, CLC_path, coastal_CLC_
 
     # get land use information from CLC 2018
     nuts2_buildings['land_use'] = zonal_stats(nuts2_buildings, CLC_path)
+
+    # get building height information
+    nuts2_buildings['land_use'] = zonal_stats(nuts2_buildings, height_path)
 
     # read coastal corine land cover layer
     coastal_CLC = gpd.read_parquet(coastal_CLC_path)
@@ -307,12 +310,15 @@ def nuts2_exposure(nuts2):
     CLC_path = os.path.join(input_data,'u2018_clc2018_v2020_20u1_raster100m','DATA','U2018_CLC2018_V2020_20u1.tif')
     coastal_CLC_path = os.path.join(input_data,'CZ_2018_DU004_3035_V010.parquet')
 
+    # Load building height path
+    height_path = os.path.join(input_data,'heights_3035.nc')
+
     # Prepare building data for the NUTS2 region
-    nuts2_buildings = prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_path)
+    nuts2_buildings = prepare_buildings(nuts2, nuts2_europe, bucco_path, CLC_path, coastal_CLC_path,height_path)
 
     if nuts2_buildings is None:
         print('INTERMEDIATE UPDATE : No buildings found for {}, will fall back to OSM'.format(nuts2))
-        nuts2_buildings = prepare_buildings(nuts2, nuts2_europe, buildings_path, CLC_path, coastal_CLC_path)
+        nuts2_buildings = prepare_buildings(nuts2, nuts2_europe, buildings_path, CLC_path, coastal_CLC_path,height_path)
 
     print('INTERMEDIATE UPDATE: Buildings prepared for {}'.format(nuts2))
 
@@ -346,3 +352,4 @@ if __name__ == "__main__":
     nuts_pilots = ['ES21']#,'ES52','ITC3','FRI3']
     for nuts2 in nuts_pilots:
         nuts2_combined = nuts2_exposure(nuts2)
+
